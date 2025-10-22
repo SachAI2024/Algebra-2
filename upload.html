@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Upload Module - Algebra 2 Tutor</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .upload-container {
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+    }
+    .upload-box {
+      border: 2px dashed #4a5568;
+      border-radius: 12px;
+      padding: 40px;
+      text-align: center;
+      background: #0f1623;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .upload-box:hover {
+      border-color: #667eea;
+      background: #121926;
+    }
+    .upload-box.dragover {
+      border-color: #667eea;
+      background: #1a2332;
+      transform: scale(1.02);
+    }
+    .file-input {
+      display: none;
+    }
+    .progress-bar-container {
+      width: 100%;
+      height: 8px;
+      background: #1a2332;
+      border-radius: 4px;
+      overflow: hidden;
+      margin: 20px 0;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea, #764ba2);
+      width: 0%;
+      transition: width 0.3s;
+    }
+    .module-list {
+      margin-top: 40px;
+    }
+    .module-card {
+      background: #0f1623;
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .status-badge {
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .status-processing {
+      background: #fbbf24;
+      color: #111;
+    }
+    .status-ready {
+      background: #10b981;
+      color: #111;
+    }
+    .status-error {
+      background: #ef4444;
+      color: #fff;
+    }
+    .config-section {
+      background: #0f1623;
+      border-radius: 12px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+    .form-group {
+      margin: 15px 0;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+      color: #9ca3af;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 10px;
+      background: #1a2332;
+      border: 1px solid #374151;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+<header class="topbar">
+  <div class="left">
+    <h1>Upload Module</h1>
+    <p class="sub">Upload PDF textbook chapters for RAG-based question generation</p>
+  </div>
+  <div class="right">
+    <a href="index.html" class="btn ghost">Back to Home</a>
+  </div>
+</header>
+
+<main class="upload-container">
+  <!-- API Configuration -->
+  <div class="config-section">
+    <h3>Configuration</h3>
+    <div class="form-group">
+      <label for="apiKey">HuggingFace API Key</label>
+      <input type="password" id="apiKey" placeholder="hf_..." />
+      <div class="tiny muted" style="margin-top: 4px;">
+        Get your free API key from
+        <a href="https://huggingface.co/settings/tokens" target="_blank" style="color: #667eea;">huggingface.co/settings/tokens</a>
+      </div>
+    </div>
+    <button class="btn primary" id="saveConfig">Save Configuration</button>
+  </div>
+
+  <!-- Upload Section -->
+  <div class="upload-box" id="uploadBox">
+    <input type="file" id="fileInput" class="file-input" accept="application/pdf" />
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="margin: 0 auto 16px;">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <h3>Drop PDF here or click to upload</h3>
+    <p class="tiny muted">Upload your Algebra 2 textbook chapter (PDF format)</p>
+  </div>
+
+  <div class="form-group">
+    <label for="moduleId">Module ID (e.g., chapter-6-polynomials)</label>
+    <input type="text" id="moduleId" placeholder="chapter-6-polynomials" />
+  </div>
+
+  <div class="progress-bar-container" id="progressContainer" style="display: none;">
+    <div class="progress-bar-fill" id="progressBar"></div>
+  </div>
+
+  <div id="status" class="tiny muted" style="text-align: center; margin: 20px 0;"></div>
+
+  <!-- Module List -->
+  <div class="module-list">
+    <div class="row space">
+      <h3>Uploaded Modules</h3>
+      <button class="btn ghost" id="refreshModules">Refresh</button>
+    </div>
+    <div id="modulesList"></div>
+  </div>
+</main>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+
+<!-- PDF.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+<!-- Core Scripts -->
+<script src="js/firebase-config.js"></script>
+<script src="js/pdf-processor.js"></script>
+<script src="js/ai-service.js"></script>
+<script src="js/rag-engine.js"></script>
+
+<script>
+  const uploadBox = document.getElementById('uploadBox');
+  const fileInput = document.getElementById('fileInput');
+  const moduleIdInput = document.getElementById('moduleId');
+  const progressContainer = document.getElementById('progressContainer');
+  const progressBar = document.getElementById('progressBar');
+  const statusEl = document.getElementById('status');
+  const modulesListEl = document.getElementById('modulesList');
+  const apiKeyInput = document.getElementById('apiKey');
+
+  // Initialize
+  async function init() {
+    await firebaseService.init();
+    await pdfProcessor.init();
+
+    // Load saved API key
+    const savedKey = aiService.getAPIKey();
+    if (savedKey) {
+      apiKeyInput.value = savedKey;
+      statusEl.textContent = '✓ API key configured';
+    }
+
+    loadModules();
+  }
+
+  // Save configuration
+  document.getElementById('saveConfig').onclick = () => {
+    const key = apiKeyInput.value.trim();
+    if (!key) {
+      alert('Please enter your HuggingFace API key');
+      return;
+    }
+    aiService.setAPIKey(key);
+    statusEl.textContent = '✓ Configuration saved';
+    setTimeout(() => statusEl.textContent = '', 3000);
+  };
+
+  // Upload box click
+  uploadBox.onclick = () => fileInput.click();
+
+  // File selection
+  fileInput.onchange = (e) => {
+    const file = e.target.files[0];
+    if (file) processFile(file);
+  };
+
+  // Drag and drop
+  uploadBox.ondragover = (e) => {
+    e.preventDefault();
+    uploadBox.classList.add('dragover');
+  };
+
+  uploadBox.ondragleave = () => {
+    uploadBox.classList.remove('dragover');
+  };
+
+  uploadBox.ondrop = (e) => {
+    e.preventDefault();
+    uploadBox.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type === 'application/pdf') {
+      processFile(file);
+    } else {
+      alert('Please upload a PDF file');
+    }
+  };
+
+  // Process PDF file
+  async function processFile(file) {
+    const moduleId = moduleIdInput.value.trim() || `module-${Date.now()}`;
+
+    if (!aiService.getAPIKey()) {
+      alert('Please configure your HuggingFace API key first');
+      return;
+    }
+
+    try {
+      // Show progress
+      progressContainer.style.display = 'block';
+      setProgress(10, 'Uploading PDF...');
+
+      // Upload to Firebase
+      await firebaseService.uploadPDF(file, moduleId);
+      setProgress(30, 'PDF uploaded. Extracting content...');
+
+      // Process PDF
+      const pdfData = await pdfProcessor.processPDF(file);
+      setProgress(50, `Extracted ${pdfData.numPages} pages. Generating embeddings...`);
+
+      // Process with RAG
+      const moduleData = await ragEngine.processPDFForRAG(file, moduleId);
+      setProgress(90, 'Saving to database...');
+
+      // Complete
+      setProgress(100, 'Module uploaded successfully!');
+
+      // Reset
+      setTimeout(() => {
+        progressContainer.style.display = 'none';
+        setProgress(0, '');
+        fileInput.value = '';
+        moduleIdInput.value = '';
+        loadModules();
+      }, 2000);
+
+    } catch (error) {
+      console.error('Upload error:', error);
+      statusEl.textContent = '❌ Error: ' + error.message;
+      statusEl.style.color = '#ef4444';
+      progressContainer.style.display = 'none';
+    }
+  }
+
+  function setProgress(percent, message) {
+    progressBar.style.width = percent + '%';
+    statusEl.textContent = message;
+    statusEl.style.color = '#9ca3af';
+  }
+
+  // Load and display modules
+  async function loadModules() {
+    try {
+      const modules = await ragEngine.loadAllModules();
+
+      if (modules.length === 0) {
+        modulesListEl.innerHTML = '<p class="tiny muted">No modules uploaded yet</p>';
+        return;
+      }
+
+      modulesListEl.innerHTML = modules.map(module => {
+        const stats = module.stats || {};
+        return `
+          <div class="module-card">
+            <div>
+              <strong>${module.moduleId}</strong>
+              <div class="tiny muted">${module.fileName || 'Unknown file'}</div>
+              <div class="tiny muted">${stats.totalChunks || 0} chunks • ${stats.totalPages || 0} pages</div>
+            </div>
+            <div>
+              <span class="status-badge status-ready">Ready</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+    } catch (error) {
+      console.error('Failed to load modules:', error);
+      modulesListEl.innerHTML = '<p class="tiny muted">Failed to load modules</p>';
+    }
+  }
+
+  document.getElementById('refreshModules').onclick = loadModules;
+
+  // Initialize on load
+  init();
+</script>
+</body>
+</html>

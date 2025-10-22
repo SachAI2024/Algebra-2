@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Practice Session - Algebra 2 Tutor</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .session-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 20px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+    .stat-box {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 12px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      display: block;
+    }
+    .stat-label {
+      font-size: 12px;
+      opacity: 0.8;
+      margin-top: 4px;
+    }
+    .question-card {
+      background: #0f1623;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+    }
+    .question-text {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+    .options-grid {
+      display: grid;
+      gap: 12px;
+    }
+    .option-btn {
+      background: #1a2332;
+      border: 2px solid #374151;
+      padding: 16px;
+      border-radius: 10px;
+      text-align: left;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: #fff;
+      font-size: 15px;
+    }
+    .option-btn:hover:not(:disabled) {
+      border-color: #667eea;
+      background: #1e2938;
+    }
+    .option-btn.selected {
+      border-color: #667eea;
+      background: #1e2938;
+    }
+    .option-btn.correct {
+      border-color: #10b981;
+      background: rgba(16, 185, 129, 0.1);
+    }
+    .option-btn.incorrect {
+      border-color: #ef4444;
+      background: rgba(239, 68, 68, 0.1);
+    }
+    .option-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .explanation-box {
+      background: #1a2332;
+      border-left: 4px solid #667eea;
+      padding: 20px;
+      margin: 20px 0;
+      border-radius: 8px;
+    }
+    .practice-problems {
+      background: #0f1623;
+      padding: 20px;
+      border-radius: 12px;
+      margin: 20px 0;
+    }
+    .practice-item {
+      background: #1a2332;
+      padding: 16px;
+      margin: 12px 0;
+      border-radius: 8px;
+    }
+    .timer-warning {
+      color: #fbbf24;
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .report-container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .report-card {
+      background: #0f1623;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+    }
+    .difficulty-chart {
+      height: 60px;
+      display: flex;
+      align-items: flex-end;
+      gap: 4px;
+      margin: 20px 0;
+    }
+    .difficulty-bar {
+      flex: 1;
+      background: #667eea;
+      border-radius: 4px 4px 0 0;
+      transition: height 0.3s;
+    }
+    .recommendation {
+      background: #1a2332;
+      border-left: 4px solid #667eea;
+      padding: 16px;
+      margin: 12px 0;
+      border-radius: 8px;
+    }
+    .recommendation.high {
+      border-left-color: #ef4444;
+    }
+    .recommendation.medium {
+      border-left-color: #fbbf24;
+    }
+  </style>
+</head>
+<body>
+<header class="topbar">
+  <div class="left">
+    <h1>Practice Session</h1>
+    <p class="sub">Adaptive learning with timed challenges</p>
+  </div>
+  <div class="right">
+    <a href="index.html" class="btn ghost">Exit</a>
+  </div>
+</header>
+
+<main class="layout">
+  <!-- Session Setup -->
+  <section class="work" id="setupView" style="max-width: 700px; margin: 40px auto;">
+    <h2>Start Practice Session</h2>
+    <div class="step">
+      <div class="form-group">
+        <label><strong>Select Module</strong></label>
+        <select id="moduleSelect" style="width: 100%; padding: 10px; background: #1a2332; border: 1px solid #374151; border-radius: 8px; color: #fff; margin-top: 8px;">
+          <option value="">Loading modules...</option>
+        </select>
+      </div>
+
+      <div class="form-group" style="margin-top: 20px;">
+        <label><strong>Session Duration</strong></label>
+        <select id="durationSelect" style="width: 100%; padding: 10px; background: #1a2332; border: 1px solid #374151; border-radius: 8px; color: #fff; margin-top: 8px;">
+          <option value="10">10 minutes</option>
+          <option value="15">15 minutes</option>
+          <option value="20" selected>20 minutes</option>
+          <option value="30">30 minutes</option>
+        </select>
+      </div>
+
+      <div class="form-group" style="margin-top: 20px;">
+        <label><strong>Target Questions</strong></label>
+        <select id="questionsSelect" style="width: 100%; padding: 10px; background: #1a2332; border: 1px solid #374151; border-radius: 8px; color: #fff; margin-top: 8px;">
+          <option value="5">5 questions</option>
+          <option value="7">7 questions</option>
+          <option value="10" selected>10 questions</option>
+          <option value="15">15 questions</option>
+        </select>
+      </div>
+
+      <button class="btn primary" id="startBtn" style="width: 100%; margin-top: 24px; padding: 14px;">
+        Start Session
+      </button>
+    </div>
+  </section>
+
+  <!-- Session View -->
+  <section class="work" id="sessionView" style="display: none; max-width: 900px; margin: 20px auto;">
+    <!-- Stats Header -->
+    <div class="session-header">
+      <div class="stats-grid">
+        <div class="stat-box">
+          <span class="stat-value" id="timerDisplay">20:00</span>
+          <span class="stat-label">Time Left</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-value" id="progressDisplay">0/10</span>
+          <span class="stat-label">Questions</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-value" id="difficultyDisplay">1</span>
+          <span class="stat-label">Difficulty</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-value" id="streakDisplay">0</span>
+          <span class="stat-label">Streak</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-value" id="accuracyDisplay">-</span>
+          <span class="stat-label">Accuracy</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Question -->
+    <div class="question-card">
+      <div class="row space">
+        <div class="badge" id="topicBadge">Topic</div>
+        <div class="chip">Attempts: <strong id="attemptsDisplay">3</strong></div>
+      </div>
+      <div class="hr" style="margin: 16px 0;"></div>
+      <div class="question-text" id="questionText">Loading question...</div>
+      <div class="options-grid" id="optionsContainer"></div>
+      <div id="feedback" style="margin-top: 16px; font-weight: 600;"></div>
+    </div>
+
+    <!-- Explanation (shown after 3 failed attempts) -->
+    <div id="explanationSection" style="display: none;">
+      <div class="explanation-box">
+        <h3>Let's Learn This!</h3>
+        <div class="hr" style="margin: 12px 0;"></div>
+        <div>
+          <strong>Correct Answer:</strong>
+          <div id="correctAnswer" style="margin: 8px 0; color: #10b981;"></div>
+        </div>
+        <div style="margin-top: 16px;">
+          <strong>Why your answer was wrong:</strong>
+          <div id="whyWrong" class="tiny" style="margin: 8px 0; line-height: 1.6;"></div>
+        </div>
+        <div style="margin-top: 16px;">
+          <strong>Solution:</strong>
+          <div id="solution" class="tiny" style="margin: 8px 0; line-height: 1.6;"></div>
+        </div>
+      </div>
+
+      <!-- Practice Problems -->
+      <div class="practice-problems">
+        <h3>Practice Problems</h3>
+        <p class="tiny muted">Work through these problems to master the concept:</p>
+        <div id="practiceContainer"></div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="row" style="margin-top: 24px; gap: 12px;">
+      <button class="btn primary" id="nextBtn" disabled>Next Question →</button>
+      <button class="btn ghost" id="pauseBtn">Pause</button>
+    </div>
+  </section>
+
+  <!-- Report View -->
+  <section class="report-container" id="reportView" style="display: none; padding: 20px;">
+    <h2>Session Complete!</h2>
+
+    <div class="report-card">
+      <h3>Performance Summary</h3>
+      <div class="stats-grid">
+        <div class="stat-box" style="background: #1a2332;">
+          <span class="stat-value" id="reportAccuracy">0%</span>
+          <span class="stat-label">Accuracy</span>
+        </div>
+        <div class="stat-box" style="background: #1a2332;">
+          <span class="stat-value" id="reportQuestions">0</span>
+          <span class="stat-label">Questions</span>
+        </div>
+        <div class="stat-box" style="background: #1a2332;">
+          <span class="stat-value" id="reportTime">0s</span>
+          <span class="stat-label">Avg Time</span>
+        </div>
+        <div class="stat-box" style="background: #1a2332;">
+          <span class="stat-value" id="reportDifficulty">1→1</span>
+          <span class="stat-label">Difficulty</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="report-card">
+      <h3>Difficulty Progression</h3>
+      <div class="difficulty-chart" id="difficultyChart"></div>
+    </div>
+
+    <div class="report-card" id="slowQuestionsCard" style="display: none;">
+      <h3>Questions That Took Longer</h3>
+      <div id="slowQuestions"></div>
+    </div>
+
+    <div class="report-card">
+      <h3>Recommendations</h3>
+      <div id="recommendations"></div>
+    </div>
+
+    <div class="row" style="margin-top: 24px; gap: 12px;">
+      <button class="btn primary" onclick="location.reload()">New Session</button>
+      <a href="index.html" class="btn ghost">Back to Home</a>
+    </div>
+  </section>
+</main>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+
+<!-- PDF.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+<!-- Core Scripts -->
+<script src="js/firebase-config.js"></script>
+<script src="js/pdf-processor.js"></script>
+<script src="js/ai-service.js"></script>
+<script src="js/rag-engine.js"></script>
+<script src="js/session-manager.js"></script>
+
+<script>
+  let currentSession = null;
+
+  // Initialize
+  async function init() {
+    await firebaseService.init();
+    await pdfProcessor.init();
+
+    // Check API key
+    if (!aiService.getAPIKey()) {
+      alert('Please configure your HuggingFace API key in the upload page first.');
+      window.location.href = 'upload.html';
+      return;
+    }
+
+    // Load modules
+    await loadModules();
+  }
+
+  async function loadModules() {
+    try {
+      const modules = await ragEngine.loadAllModules();
+      const select = document.getElementById('moduleSelect');
+
+      if (modules.length === 0) {
+        select.innerHTML = '<option value="">No modules available. Upload a PDF first.</option>';
+        document.getElementById('startBtn').disabled = true;
+        return;
+      }
+
+      select.innerHTML = modules.map(m =>
+        `<option value="${m.id}">${m.moduleId || m.id}</option>`
+      ).join('');
+
+    } catch (error) {
+      console.error('Failed to load modules:', error);
+      alert('Failed to load modules: ' + error.message);
+    }
+  }
+
+  // Start session
+  document.getElementById('startBtn').onclick = async () => {
+    const moduleId = document.getElementById('moduleSelect').value;
+    const duration = parseInt(document.getElementById('durationSelect').value);
+    const questions = parseInt(document.getElementById('questionsSelect').value);
+
+    if (!moduleId) {
+      alert('Please select a module');
+      return;
+    }
+
+    document.getElementById('startBtn').disabled = true;
+    document.getElementById('startBtn').textContent = 'Starting...';
+
+    try {
+      currentSession = sessionManager.startSession({
+        moduleId,
+        duration: duration * 60 * 1000,
+        targetQuestions: questions,
+        userId: 'student_' + Date.now()
+      });
+
+      // Switch views
+      document.getElementById('setupView').style.display = 'none';
+      document.getElementById('sessionView').style.display = 'block';
+
+      // Load first question
+      await loadNextQuestion();
+
+      // Start timer updates
+      startTimerUpdates();
+
+    } catch (error) {
+      console.error('Failed to start session:', error);
+      alert('Failed to start session: ' + error.message);
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('startBtn').textContent = 'Start Session';
+    }
+  };
+
+  async function loadNextQuestion() {
+    try {
+      document.getElementById('feedback').textContent = '';
+      document.getElementById('explanationSection').style.display = 'none';
+      document.getElementById('nextBtn').disabled = true;
+
+      const question = await sessionManager.getNextQuestion();
+
+      if (!question) {
+        // Session ended
+        await showReport();
+        return;
+      }
+
+      // Display question
+      document.getElementById('questionText').textContent = question.question;
+      document.getElementById('topicBadge').textContent = question.topic;
+      document.getElementById('attemptsDisplay').textContent = question.attemptsRemaining;
+
+      // Display options
+      const optionsContainer = document.getElementById('optionsContainer');
+      optionsContainer.innerHTML = question.options.map((option, idx) =>
+        `<button class="option-btn" data-index="${idx}">${String.fromCharCode(65 + idx)}) ${option}</button>`
+      ).join('');
+
+      // Add click handlers
+      document.querySelectorAll('.option-btn').forEach(btn => {
+        btn.onclick = () => submitAnswer(parseInt(btn.dataset.index));
+      });
+
+      updateStats();
+
+    } catch (error) {
+      console.error('Failed to load question:', error);
+      document.getElementById('feedback').innerHTML = `<span style="color: #ef4444;">Error loading question: ${error.message}</span>`;
+    }
+  }
+
+  async function submitAnswer(selectedIndex) {
+    // Disable all buttons
+    document.querySelectorAll('.option-btn').forEach(btn => btn.disabled = true);
+
+    try {
+      const result = await sessionManager.submitAnswer(selectedIndex);
+
+      // Update feedback
+      const feedbackEl = document.getElementById('feedback');
+      feedbackEl.textContent = result.feedback;
+      feedbackEl.style.color = result.isCorrect ? '#10b981' : '#ef4444';
+
+      // Update attempts
+      document.getElementById('attemptsDisplay').textContent = result.attemptsRemaining;
+
+      // Highlight selected option
+      const buttons = document.querySelectorAll('.option-btn');
+      buttons[selectedIndex].classList.add(result.isCorrect ? 'correct' : 'incorrect');
+
+      if (result.nextAction === 'next_question') {
+        // Correct answer, enable next button
+        document.getElementById('nextBtn').disabled = false;
+
+      } else if (result.nextAction === 'retry') {
+        // Re-enable buttons for retry
+        buttons.forEach(btn => btn.disabled = false);
+        buttons[selectedIndex].disabled = true; // Keep wrong answer disabled
+
+      } else if (result.nextAction === 'show_explanation') {
+        // Show explanation and practice
+        const question = sessionManager.getCurrentQuestion();
+        buttons[question.correctIndex].classList.add('correct');
+
+        showExplanation(result.explanation, result.practiceProblems);
+        document.getElementById('nextBtn').disabled = false;
+      }
+
+      updateStats();
+
+    } catch (error) {
+      console.error('Submit error:', error);
+      document.querySelectorAll('.option-btn').forEach(btn => btn.disabled = false);
+    }
+  }
+
+  function showExplanation(explanation, practiceProblems) {
+    document.getElementById('explanationSection').style.display = 'block';
+    document.getElementById('correctAnswer').textContent = explanation.correctAnswer;
+    document.getElementById('whyWrong').textContent = explanation.whyWrong;
+    document.getElementById('solution').textContent = explanation.solution;
+
+    const practiceContainer = document.getElementById('practiceContainer');
+    practiceContainer.innerHTML = practiceProblems.map((p, idx) =>
+      `<div class="practice-item">
+        <strong>${idx + 1}. ${p.problem}</strong>
+        <details style="margin-top: 8px;">
+          <summary class="tiny muted" style="cursor: pointer;">Show answer</summary>
+          <div class="tiny" style="margin-top: 8px; color: #10b981;">
+            <strong>Answer:</strong> ${p.answer}
+            <br><strong>Hint:</strong> ${p.hint}
+          </div>
+        </details>
+      </div>`
+    ).join('');
+  }
+
+  // Next question
+  document.getElementById('nextBtn').onclick = () => {
+    sessionManager.nextQuestion();
+    loadNextQuestion();
+  };
+
+  // Timer updates
+  function startTimerUpdates() {
+    window.addEventListener('session-time-update', (e) => {
+      const { remaining } = e.detail;
+      const minutes = Math.floor(remaining / 60000);
+      const seconds = Math.floor((remaining % 60000) / 1000);
+
+      const timerEl = document.getElementById('timerDisplay');
+      timerEl.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+      if (remaining < 60000) {
+        timerEl.classList.add('timer-warning');
+      }
+    });
+  }
+
+  function updateStats() {
+    const stats = sessionManager.getSessionStats();
+    if (!stats) return;
+
+    document.getElementById('progressDisplay').textContent = `${stats.questionsCompleted}/${stats.questionsTotal}`;
+    document.getElementById('difficultyDisplay').textContent = stats.currentDifficulty;
+    document.getElementById('streakDisplay').textContent = stats.streak;
+    document.getElementById('accuracyDisplay').textContent = stats.accuracy + '%';
+  }
+
+  // Pause/Resume
+  let isPaused = false;
+  document.getElementById('pauseBtn').onclick = () => {
+    if (isPaused) {
+      sessionManager.resumeTimer();
+      document.getElementById('pauseBtn').textContent = 'Pause';
+    } else {
+      sessionManager.pauseTimer();
+      document.getElementById('pauseBtn').textContent = 'Resume';
+    }
+    isPaused = !isPaused;
+  };
+
+  async function showReport() {
+    const { report } = await sessionManager.endSession();
+
+    // Hide session view
+    document.getElementById('sessionView').style.display = 'none';
+    document.getElementById('reportView').style.display = 'block';
+
+    // Fill report data
+    document.getElementById('reportAccuracy').textContent = report.accuracy + '%';
+    document.getElementById('reportQuestions').textContent = `${report.correctAnswers}/${report.totalQuestions}`;
+    document.getElementById('reportTime').textContent = report.avgTimePerQuestion + 's';
+    document.getElementById('reportDifficulty').textContent = `${report.startDifficulty}→${report.endDifficulty}`;
+
+    // Difficulty chart
+    const chartEl = document.getElementById('difficultyChart');
+    const maxDiff = Math.max(...report.difficultyChart);
+    chartEl.innerHTML = report.difficultyChart.map(d =>
+      `<div class="difficulty-bar" style="height: ${(d / maxDiff) * 100}%;"></div>`
+    ).join('');
+
+    // Slow questions
+    if (report.slowQuestions.length > 0) {
+      document.getElementById('slowQuestionsCard').style.display = 'block';
+      document.getElementById('slowQuestions').innerHTML = report.slowQuestions.map(q =>
+        `<div class="practice-item">
+          <strong>Question ${q.questionNumber}</strong> - ${q.topic}
+          <div class="tiny muted">Took ${q.timeTaken}s (Difficulty ${q.difficulty})</div>
+        </div>`
+      ).join('');
+    }
+
+    // Recommendations
+    document.getElementById('recommendations').innerHTML = report.recommendations.map(r =>
+      `<div class="recommendation ${r.priority}">
+        <strong>${r.message}</strong>
+        ${r.suggestion ? `<div class="tiny muted" style="margin-top: 4px;">${r.suggestion}</div>` : ''}
+      </div>`
+    ).join('');
+  }
+
+  init();
+</script>
+</body>
+</html>
