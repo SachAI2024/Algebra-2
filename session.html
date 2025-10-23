@@ -333,22 +333,32 @@
 <script src="js/session-manager.js"></script>
 
 <script>
+  // Wait for DOM to be fully loaded
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log('Session page: DOM loaded');
+
   let currentSession = null;
 
   // Initialize
   async function init() {
-    await firebaseService.init();
-    await pdfProcessor.init();
+    console.log('Session page: Initializing...');
+    try {
+      await firebaseService.init();
+      await pdfProcessor.init();
 
-    // Check API key
-    if (!aiService.getAPIKey()) {
-      alert('Please configure your HuggingFace API key in the upload page first.');
-      window.location.href = 'upload.html';
-      return;
+      // Check API key
+      if (!aiService.getAPIKey()) {
+        alert('Please configure your HuggingFace API key in the upload page first.');
+        window.location.href = 'upload.html';
+        return;
+      }
+
+      // Load modules
+      await loadModules();
+    } catch (error) {
+      console.error('Session init error:', error);
+      alert('Initialization failed: ' + error.message);
     }
-
-    // Load modules
-    await loadModules();
   }
 
   async function loadModules() {
@@ -601,7 +611,11 @@
     ).join('');
   }
 
+  // Start initialization
+  console.log('Session page: Starting init()');
   init();
+
+}); // End DOMContentLoaded
 </script>
 </body>
 </html>

@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Upload Configuration</title>
+  <style>
+    body { font-family: sans-serif; padding: 40px; max-width: 600px; margin: 0 auto; }
+    .test-section { border: 2px solid #ddd; padding: 20px; margin: 20px 0; border-radius: 8px; }
+    .pass { border-color: #10b981; background: #d1fae5; }
+    .fail { border-color: #ef4444; background: #fee2e2; }
+    button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+    input { padding: 8px; width: 100%; margin: 10px 0; }
+    pre { background: #f3f4f6; padding: 10px; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Upload Configuration Test Suite</h1>
+
+  <div class="test-section" id="test1">
+    <h3>Test 1: API Key Save/Load</h3>
+    <input type="text" id="testKey" placeholder="Enter test API key (e.g., hf_test123)" value="hf_test_key_123456789">
+    <button onclick="testSaveKey()">Save Key</button>
+    <button onclick="testLoadKey()">Load Key</button>
+    <button onclick="testClearKey()">Clear Key</button>
+    <div id="result1"></div>
+  </div>
+
+  <div class="test-section" id="test2">
+    <h3>Test 2: LocalStorage Access</h3>
+    <button onclick="testLocalStorage()">Test LocalStorage</button>
+    <div id="result2"></div>
+  </div>
+
+  <div class="test-section" id="test3">
+    <h3>Test 3: AIService Instance</h3>
+    <button onclick="testAIServiceInstance()">Test AI Service</button>
+    <div id="result3"></div>
+  </div>
+
+  <div class="test-section" id="test4">
+    <h3>Test 4: Script Loading</h3>
+    <button onclick="testScriptLoading()">Check Scripts</button>
+    <div id="result4"></div>
+  </div>
+
+  <div class="test-section" id="test5">
+    <h3>Test 5: Full Integration Test</h3>
+    <button onclick="runFullTest()">Run Full Test</button>
+    <div id="result5"></div>
+  </div>
+
+  <!-- Load Scripts -->
+  <script src="js/ai-service.js"></script>
+
+  <script>
+    let testResults = {
+      passed: 0,
+      failed: 0,
+      tests: []
+    };
+
+    function logTest(testName, passed, message) {
+      testResults.tests.push({ testName, passed, message });
+      if (passed) {
+        testResults.passed++;
+      } else {
+        testResults.failed++;
+      }
+    }
+
+    function showResult(elementId, passed, message) {
+      const el = document.getElementById(elementId);
+      el.innerHTML = `
+        <p style="color: ${passed ? '#10b981' : '#ef4444'}; font-weight: bold;">
+          ${passed ? '✅ PASS' : '❌ FAIL'}
+        </p>
+        <pre>${message}</pre>
+      `;
+      document.getElementById(elementId.replace('result', 'test')).className =
+        'test-section ' + (passed ? 'pass' : 'fail');
+    }
+
+    function testSaveKey() {
+      try {
+        const testKey = document.getElementById('testKey').value;
+        if (typeof aiService === 'undefined') {
+          showResult('result1', false, 'Error: aiService is not defined');
+          logTest('Save Key', false, 'aiService not defined');
+          return;
+        }
+
+        aiService.setAPIKey(testKey);
+        const saved = localStorage.getItem('hf_api_key');
+
+        if (saved === testKey) {
+          showResult('result1', true, `Key saved successfully!\nSaved: ${saved}`);
+          logTest('Save Key', true, 'Key saved to localStorage');
+        } else {
+          showResult('result1', false, `Key mismatch!\nExpected: ${testKey}\nGot: ${saved}`);
+          logTest('Save Key', false, 'Key mismatch');
+        }
+      } catch (error) {
+        showResult('result1', false, `Error: ${error.message}\n${error.stack}`);
+        logTest('Save Key', false, error.message);
+      }
+    }
+
+    function testLoadKey() {
+      try {
+        if (typeof aiService === 'undefined') {
+          showResult('result1', false, 'Error: aiService is not defined');
+          return;
+        }
+
+        const loaded = aiService.getAPIKey();
+        const fromStorage = localStorage.getItem('hf_api_key');
+
+        if (loaded === fromStorage) {
+          showResult('result1', true, `Key loaded successfully!\nKey: ${loaded || '(empty)'}`);
+          logTest('Load Key', true, 'Key loaded from localStorage');
+        } else {
+          showResult('result1', false, `Load mismatch!\nFrom service: ${loaded}\nFrom storage: ${fromStorage}`);
+          logTest('Load Key', false, 'Load mismatch');
+        }
+      } catch (error) {
+        showResult('result1', false, `Error: ${error.message}`);
+        logTest('Load Key', false, error.message);
+      }
+    }
+
+    function testClearKey() {
+      try {
+        localStorage.removeItem('hf_api_key');
+        aiService.apiKey = '';
+        showResult('result1', true, 'Key cleared successfully');
+        logTest('Clear Key', true, 'Key cleared');
+      } catch (error) {
+        showResult('result1', false, `Error: ${error.message}`);
+        logTest('Clear Key', false, error.message);
+      }
+    }
+
+    function testLocalStorage() {
+      try {
+        // Test if localStorage is available
+        localStorage.setItem('test_item', 'test_value');
+        const retrieved = localStorage.getItem('test_item');
+        localStorage.removeItem('test_item');
+
+        if (retrieved === 'test_value') {
+          showResult('result2', true, 'LocalStorage is working correctly');
+          logTest('LocalStorage', true, 'LocalStorage accessible');
+        } else {
+          showResult('result2', false, 'LocalStorage read/write failed');
+          logTest('LocalStorage', false, 'Read/write failed');
+        }
+      } catch (error) {
+        showResult('result2', false, `LocalStorage not available: ${error.message}`);
+        logTest('LocalStorage', false, 'Not available');
+      }
+    }
+
+    function testAIServiceInstance() {
+      try {
+        const checks = [];
+
+        // Check if aiService exists
+        if (typeof aiService === 'undefined') {
+          showResult('result3', false, 'aiService global instance not found');
+          logTest('AIService Instance', false, 'Instance not found');
+          return;
+        }
+        checks.push('✓ aiService instance exists');
+
+        // Check methods
+        if (typeof aiService.setAPIKey === 'function') {
+          checks.push('✓ setAPIKey method exists');
+        } else {
+          checks.push('✗ setAPIKey method missing');
+        }
+
+        if (typeof aiService.getAPIKey === 'function') {
+          checks.push('✓ getAPIKey method exists');
+        } else {
+          checks.push('✗ getAPIKey method missing');
+        }
+
+        // Check properties
+        checks.push(`✓ baseURL: ${aiService.baseURL}`);
+        checks.push(`✓ mathModel: ${aiService.mathModel}`);
+
+        const allPassed = !checks.some(c => c.startsWith('✗'));
+        showResult('result3', allPassed, checks.join('\n'));
+        logTest('AIService Instance', allPassed, checks.join(', '));
+      } catch (error) {
+        showResult('result3', false, `Error: ${error.message}`);
+        logTest('AIService Instance', false, error.message);
+      }
+    }
+
+    function testScriptLoading() {
+      const scripts = [
+        { name: 'ai-service.js', check: () => typeof aiService !== 'undefined' }
+      ];
+
+      const results = scripts.map(script => {
+        const loaded = script.check();
+        return `${loaded ? '✅' : '❌'} ${script.name}: ${loaded ? 'Loaded' : 'Not loaded'}`;
+      });
+
+      const allLoaded = scripts.every(s => s.check());
+      showResult('result4', allLoaded, results.join('\n'));
+      logTest('Script Loading', allLoaded, results.join(', '));
+    }
+
+    function runFullTest() {
+      testResults = { passed: 0, failed: 0, tests: [] };
+
+      // Run all tests
+      testLocalStorage();
+      setTimeout(() => {
+        testScriptLoading();
+        setTimeout(() => {
+          testAIServiceInstance();
+          setTimeout(() => {
+            // Full integration test
+            try {
+              const testKey = 'hf_integration_test_' + Date.now();
+
+              // Save
+              aiService.setAPIKey(testKey);
+              const saved = localStorage.getItem('hf_api_key');
+
+              // Load
+              aiService.apiKey = ''; // Reset
+              const loaded = aiService.getAPIKey();
+
+              // Clean up
+              localStorage.removeItem('hf_api_key');
+              aiService.apiKey = '';
+
+              if (saved === testKey && loaded === testKey) {
+                showResult('result5', true,
+                  `Full integration test PASSED!\n\n` +
+                  `Total Tests: ${testResults.tests.length + 1}\n` +
+                  `Passed: ${testResults.passed + 1}\n` +
+                  `Failed: ${testResults.failed}\n\n` +
+                  `Test Details:\n${testResults.tests.map(t =>
+                    `${t.passed ? '✅' : '❌'} ${t.testName}: ${t.message}`
+                  ).join('\n')}`
+                );
+                logTest('Full Integration', true, 'All tests passed');
+              } else {
+                showResult('result5', false,
+                  `Integration test FAILED!\nExpected: ${testKey}\nSaved: ${saved}\nLoaded: ${loaded}`
+                );
+                logTest('Full Integration', false, 'Save/load cycle failed');
+              }
+            } catch (error) {
+              showResult('result5', false, `Integration test error: ${error.message}`);
+              logTest('Full Integration', false, error.message);
+            }
+          }, 100);
+        }, 100);
+      }, 100);
+    }
+
+    // Auto-run on load
+    window.addEventListener('load', () => {
+      console.log('Test page loaded');
+      testScriptLoading();
+    });
+  </script>
+</body>
+</html>
