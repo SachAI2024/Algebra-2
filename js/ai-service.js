@@ -8,16 +8,36 @@ class AIService {
     this.mathModel = 'Qwen/Qwen2.5-Math-72B-Instruct'; // or smaller: Qwen/Qwen2-Math-7B-Instruct
     this.visionModel = 'llava-hf/llava-1.5-7b-hf'; // For image analysis
     this.embeddingModel = 'sentence-transformers/all-MiniLM-L6-v2';
+    this.moduleName = 'AIService';
+
+    if (window.logger) {
+      logger.info(this.moduleName, 'AIService initialized', {
+        mathModel: this.mathModel,
+        visionModel: this.visionModel,
+        embeddingModel: this.embeddingModel
+      });
+    }
   }
 
   setAPIKey(key) {
     this.apiKey = key;
     localStorage.setItem('hf_api_key', key);
+    if (window.logger) {
+      logger.info(this.moduleName, 'API key configured', {
+        keyLength: key ? key.length : 0,
+        masked: key ? `${key.substring(0, 8)}...` : 'none'
+      });
+    }
   }
 
   getAPIKey() {
     if (!this.apiKey) {
       this.apiKey = localStorage.getItem('hf_api_key') || '';
+      if (window.logger) {
+        logger.debug(this.moduleName, 'API key loaded from localStorage', {
+          hasKey: !!this.apiKey
+        });
+      }
     }
     return this.apiKey;
   }
@@ -25,12 +45,31 @@ class AIService {
   async _callAPI(model, payload, retries = 3) {
     const apiKey = this.getAPIKey();
     if (!apiKey) {
-      throw new Error('HuggingFace API key not set. Please configure in settings.');
+      const error = new Error('HuggingFace API key not set. Please configure in settings.');
+      if (window.logger) {
+        logger.error(this.moduleName, 'API key missing', { model });
+      }
+      throw error;
+    }
+
+    const startTime = performance.now();
+    const endpoint = this.baseURL + model;
+
+    if (window.logger) {
+      logger.logAPICall(this.moduleName, endpoint, 'POST', {
+        model,
+        payloadSize: JSON.stringify(payload).length,
+        retries
+      });
     }
 
     for (let i = 0; i < retries; i++) {
       try {
-        const response = await fetch(this.baseURL + model, {
+        if (window.logger && i > 0) {
+          logger.warn(this.moduleName, `Retry attempt ${i + 1}/${retries}`, { model, endpoint });
+        }
+
+        const response = await fetch(endpoint, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${apiKey}`,
@@ -39,44 +78,137 @@ class AIService {
           body: JSON.stringify(payload)
         });
 
+        const duration = performance.now() - startTime;
+
         if (response.status === 503) {
           // Model is loading, wait and retry
           const data = await response.json();
           const waitTime = data.estimated_time || 20;
-          console.log(`Model loading, waiting ${waitTime}s...`);
+
+          if (window.logger) {
+            logger.notice(this.moduleName, 'Model loading, waiting for availability', {
+              model,
+              estimatedWaitTime: `${waitTime}s`,
+              attempt: i + 1
+            });
+          }
+
           await new Promise(resolve => setTimeout(resolve, waitTime * 1000));
           continue;
         }
 
         if (!response.ok) {
           const error = await response.text();
-          throw new Error(`API Error: ${response.status} - ${error}`);
+          const errorMsg = `API Error: ${response.status} - ${error}`;
+
+          if (window.logger) {
+            logger.logAPIResponse(this.moduleName, endpoint, response.status, duration, {
+              error: error.substring(0, 200),
+              attempt: i + 1
+            });
+          }
+
+          throw new Error(errorMsg);
         }
 
-        return await response.json();
+        const result = await response.json();
+
+        if (window.logger) {
+          logger.logAPIResponse(this.moduleName, endpoint, response.status, duration, {
+            success: true,
+            resultSize: JSON.stringify(result).length
+          });
+
+          // Check performance threshold
+          if (LogConfig.features?.logPerformance && duration > (LogConfig.performanceThresholds?.apiCall || 5000)) {
+            logger.warn(this.moduleName, 'API call exceeded performance threshold', {
+              endpoint,
+              duration: `${duration.toFixed(2)}ms`,
+              threshold: `${LogConfig.performanceThresholds?.apiCall}ms`
+            });
+          }
+        }
+
+        return result;
       } catch (error) {
-        if (i === retries - 1) throw error;
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        if (i === retries - 1) {
+          if (window.logger) {
+            logger.error(this.moduleName, 'API call failed after all retries', {
+              model,
+              endpoint,
+              attempts: retries,
+              error: error.message,
+              duration: `${(performance.now() - startTime).toFixed(2)}ms`
+            });
+          }
+          throw error;
+        }
+
+        const backoffDelay = 2000 * Math.pow(2, i); // Exponential backoff
+        if (window.logger) {
+          logger.debug(this.moduleName, 'Retrying after error', {
+            attempt: i + 1,
+            backoffDelay: `${backoffDelay}ms`,
+            error: error.message
+          });
+        }
+
+        await new Promise(resolve => setTimeout(resolve, backoffDelay));
       }
     }
   }
 
   // Generate embeddings for text chunks
   async generateEmbedding(text) {
+    if (window.logger) {
+      logger.debug(this.moduleName, 'Generating embedding', {
+        textLength: text.length,
+        preview: text.substring(0, 50)
+      });
+    }
+
+    const startTime = performance.now();
     const result = await this._callAPI(this.embeddingModel, {
       inputs: text
     });
 
-    return Array.isArray(result) ? result[0] : result;
+    const embedding = Array.isArray(result) ? result[0] : result;
+
+    if (window.logger) {
+      const duration = performance.now() - startTime;
+      logger.debug(this.moduleName, 'Embedding generated', {
+        dimensions: embedding?.length || 0,
+        duration: `${duration.toFixed(2)}ms`
+      });
+    }
+
+    return embedding;
   }
 
   // Generate embeddings for multiple texts
   async generateEmbeddings(texts) {
+    if (window.logger) {
+      logger.perfStart('generateEmbeddings');
+      logger.info(this.moduleName, 'Batch embedding generation started', {
+        totalTexts: texts.length,
+        batchSize: 5,
+        estimatedBatches: Math.ceil(texts.length / 5)
+      });
+    }
+
     const embeddings = [];
 
     // Batch process to avoid rate limits
     for (let i = 0; i < texts.length; i += 5) {
       const batch = texts.slice(i, i + 5);
+
+      if (window.logger) {
+        logger.debug(this.moduleName, `Processing batch ${Math.floor(i / 5) + 1}`, {
+          batchStart: i,
+          batchSize: batch.length
+        });
+      }
+
       const batchResults = await Promise.all(
         batch.map(text => this.generateEmbedding(text))
       );
@@ -88,11 +220,29 @@ class AIService {
       }
     }
 
+    if (window.logger) {
+      const duration = logger.perfEnd('generateEmbeddings', this.moduleName);
+      logger.info(this.moduleName, 'Batch embedding generation completed', {
+        totalEmbeddings: embeddings.length,
+        totalDuration: `${duration?.toFixed(2)}ms`,
+        avgPerEmbedding: `${(duration / embeddings.length).toFixed(2)}ms`
+      });
+    }
+
     return embeddings;
   }
 
   // Generate a math question based on context
   async generateQuestion(context, difficulty, topic) {
+    if (window.logger) {
+      logger.perfStart('generateQuestion');
+      logger.info(this.moduleName, 'Generating question', {
+        difficulty,
+        topic,
+        contextLength: context.length
+      });
+    }
+
     const prompt = this._buildQuestionPrompt(context, difficulty, topic);
 
     const result = await this._callAPI(this.mathModel, {
@@ -106,7 +256,27 @@ class AIService {
     });
 
     const response = result[0]?.generated_text || result.generated_text || '';
-    return this._parseQuestionResponse(response);
+    const question = this._parseQuestionResponse(response);
+
+    if (window.logger) {
+      const duration = logger.perfEnd('generateQuestion', this.moduleName);
+      logger.info(this.moduleName, 'Question generated', {
+        difficulty,
+        topic,
+        isGenerated: question.generated,
+        duration: `${duration?.toFixed(2)}ms`,
+        hasOptions: question.options?.length || 0
+      });
+
+      if (LogConfig.features?.logPerformance && duration > (LogConfig.performanceThresholds?.questionGeneration || 5000)) {
+        logger.warn(this.moduleName, 'Question generation exceeded performance threshold', {
+          duration: `${duration?.toFixed(2)}ms`,
+          threshold: `${LogConfig.performanceThresholds?.questionGeneration}ms`
+        });
+      }
+    }
+
+    return question;
   }
 
   _buildQuestionPrompt(context, difficulty, topic) {
@@ -150,12 +320,27 @@ Begin:`;
     const solutionMatch = response.match(/SOLUTION:\s*(.+)/s);
 
     if (!questionMatch || !optionsMatch || !correctMatch) {
-      console.warn('Failed to parse question, using fallback');
+      if (window.logger) {
+        logger.warn(this.moduleName, 'Failed to parse question response, using fallback', {
+          hasQuestion: !!questionMatch,
+          hasOptions: !!optionsMatch,
+          hasCorrect: !!correctMatch,
+          responsePreview: response.substring(0, 100)
+        });
+      }
       return this._createFallbackQuestion();
     }
 
     const options = optionsMatch.map(opt => opt.trim().substring(3).trim());
     const correctIndex = correctMatch[1].charCodeAt(0) - 65; // A=0, B=1, etc.
+
+    if (window.logger) {
+      logger.debug(this.moduleName, 'Question parsed successfully', {
+        optionsCount: options.length,
+        correctAnswer: correctMatch[1],
+        hasSolution: !!solutionMatch
+      });
+    }
 
     return {
       question: questionMatch[1].trim(),
@@ -178,6 +363,14 @@ Begin:`;
 
   // Generate explanation for wrong answer
   async explainMistake(question, userAnswer, correctAnswer, context) {
+    if (window.logger) {
+      logger.info(this.moduleName, 'Generating mistake explanation', {
+        questionPreview: question.substring(0, 50),
+        userAnswer,
+        correctAnswer
+      });
+    }
+
     const prompt = `You are an Algebra 2 tutor helping a student understand their mistake.
 
 Question: ${question}
@@ -194,6 +387,7 @@ Explain:
 
 Keep it encouraging and educational. Use simple language for high school students.`;
 
+    const startTime = performance.now();
     const result = await this._callAPI(this.mathModel, {
       inputs: prompt,
       parameters: {
@@ -203,11 +397,28 @@ Keep it encouraging and educational. Use simple language for high school student
       }
     });
 
-    return result[0]?.generated_text || result.generated_text || 'Focus on understanding the core concept and try again!';
+    const explanation = result[0]?.generated_text || result.generated_text || 'Focus on understanding the core concept and try again!';
+
+    if (window.logger) {
+      const duration = performance.now() - startTime;
+      logger.info(this.moduleName, 'Mistake explanation generated', {
+        duration: `${duration.toFixed(2)}ms`,
+        explanationLength: explanation.length
+      });
+    }
+
+    return explanation;
   }
 
   // Generate practice problems after failure
   async generatePracticeProblems(topic, count = 4) {
+    if (window.logger) {
+      logger.info(this.moduleName, 'Generating practice problems', {
+        topic,
+        count
+      });
+    }
+
     const prompt = `Create ${count} simple practice problems about ${topic} for Algebra 2 students.
 
 For each problem, provide:
@@ -222,6 +433,7 @@ HINT: [hint]
 
 Begin:`;
 
+    const startTime = performance.now();
     const result = await this._callAPI(this.mathModel, {
       inputs: prompt,
       parameters: {
@@ -232,7 +444,18 @@ Begin:`;
     });
 
     const response = result[0]?.generated_text || result.generated_text || '';
-    return this._parsePracticeProblems(response);
+    const problems = this._parsePracticeProblems(response);
+
+    if (window.logger) {
+      const duration = performance.now() - startTime;
+      logger.info(this.moduleName, 'Practice problems generated', {
+        topic,
+        problemsGenerated: problems.length,
+        duration: `${duration.toFixed(2)}ms`
+      });
+    }
+
+    return problems;
   }
 
   _parsePracticeProblems(response) {
@@ -267,14 +490,35 @@ Begin:`;
 
   // Analyze image from PDF (if contains diagram/graph)
   async analyzeImage(imageBase64) {
+    if (window.logger) {
+      logger.info(this.moduleName, 'Analyzing image with vision model', {
+        imageSize: imageBase64.length
+      });
+    }
+
     try {
+      const startTime = performance.now();
       const result = await this._callAPI(this.visionModel, {
         inputs: imageBase64
       });
 
-      return result[0]?.generated_text || 'Image analyzed';
+      const analysis = result[0]?.generated_text || 'Image analyzed';
+
+      if (window.logger) {
+        const duration = performance.now() - startTime;
+        logger.info(this.moduleName, 'Image analysis completed', {
+          duration: `${duration.toFixed(2)}ms`,
+          resultLength: analysis.length
+        });
+      }
+
+      return analysis;
     } catch (error) {
-      console.warn('Vision model error:', error);
+      if (window.logger) {
+        logger.warn(this.moduleName, 'Vision model error, using fallback', {
+          error: error.message
+        });
+      }
       return 'Image contains mathematical content (diagram/graph/equation)';
     }
   }
@@ -291,7 +535,17 @@ Begin:`;
     const textLower = text.toLowerCase();
     const found = topics.filter(topic => textLower.includes(topic));
 
-    return found.length > 0 ? found[0] : 'algebra';
+    const extractedTopic = found.length > 0 ? found[0] : 'algebra';
+
+    if (window.logger) {
+      logger.debug(this.moduleName, 'Topic extracted from text', {
+        topic: extractedTopic,
+        allFound: found,
+        textPreview: text.substring(0, 50)
+      });
+    }
+
+    return extractedTopic;
   }
 }
 

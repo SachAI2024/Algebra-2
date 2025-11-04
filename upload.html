@@ -167,11 +167,18 @@
 <!-- PDF.js -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
+<!-- Logging System (must load first) -->
+<script src="js/logger.js"></script>
+<script src="js/log-config.js"></script>
+
 <!-- Core Scripts -->
 <script src="js/firebase-config.js"></script>
 <script src="js/pdf-processor.js"></script>
 <script src="js/ai-service.js"></script>
 <script src="js/rag-engine.js"></script>
+
+<!-- Logging Instrumentation (must load after modules) -->
+<script src="js/logging-init.js"></script>
 
 <script>
   // Wait for DOM to be fully loaded

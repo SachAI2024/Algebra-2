@@ -6,11 +6,23 @@ class RAGEngine {
     this.chunks = [];
     this.embeddings = [];
     this.moduleData = {};
+    this.moduleName = 'RAGEngine';
+
+    if (window.logger) {
+      logger.info(this.moduleName, 'RAGEngine initialized');
+    }
   }
 
   // Process uploaded PDF and create RAG index
   async processPDFForRAG(pdfFile, moduleId) {
-    console.log(`Processing PDF for RAG: ${moduleId}`);
+    if (window.logger) {
+      logger.perfStart(`processPDFForRAG-${moduleId}`);
+      logger.info(this.moduleName, 'Starting PDF processing for RAG', {
+        moduleId,
+        fileName: pdfFile.name,
+        fileSize: `${(pdfFile.size / 1024).toFixed(2)} KB`
+      });
+    }
 
     // Extract content from PDF
     const pdfData = await pdfProcessor.processPDF(pdfFile, {
@@ -18,8 +30,24 @@ class RAGEngine {
       extractImages: true
     });
 
+    if (window.logger) {
+      logger.info(this.moduleName, 'PDF extraction completed', {
+        moduleId,
+        pages: pdfData.numPages,
+        hasImages: pdfData.pages.some(p => p.images?.length > 0)
+      });
+    }
+
     // Combine all page text
     const fullText = pdfData.pages.map(p => p.text).join('\n\n');
+
+    if (window.logger) {
+      logger.debug(this.moduleName, 'Text combined from all pages', {
+        moduleId,
+        totalTextLength: fullText.length,
+        pagesProcessed: pdfData.pages.length
+      });
+    }
 
     // Chunk the text
     const textChunks = pdfProcessor.chunkText(fullText, {
@@ -27,12 +55,25 @@ class RAGEngine {
       overlap: 100
     });
 
-    console.log(`Created ${textChunks.length} text chunks`);
+    if (window.logger) {
+      logger.info(this.moduleName, 'Text chunking completed', {
+        moduleId,
+        chunkCount: textChunks.length,
+        avgChunkSize: Math.round(textChunks.reduce((sum, c) => sum + c.length, 0) / textChunks.length),
+        chunkConfig: { maxChunkSize: 800, overlap: 100 }
+      });
+    }
 
     // Generate embeddings for chunks
     const embeddings = await aiService.generateEmbeddings(textChunks);
 
-    console.log(`Generated ${embeddings.length} embeddings`);
+    if (window.logger) {
+      logger.info(this.moduleName, 'Embeddings generated for all chunks', {
+        moduleId,
+        embeddingCount: embeddings.length,
+        dimensions: embeddings[0]?.length || 0
+      });
+    }
 
     // Extract images with context
     const imageChunks = this._extractImageChunks(pdfData.pages);
@@ -78,8 +119,45 @@ class RAGEngine {
 
     this.moduleData[moduleId] = moduleContent;
 
+    if (window.logger) {
+      logger.debug(this.moduleName, 'Module content prepared', {
+        moduleId,
+        stats: moduleContent.stats,
+        memoryUsage: `${JSON.stringify(moduleContent).length} bytes`
+      });
+    }
+
     // Save to Firebase
-    await firebaseService.saveContent(moduleId, moduleContent);
+    try {
+      await firebaseService.saveContent(moduleId, moduleContent);
+
+      if (window.logger) {
+        const duration = logger.perfEnd(`processPDFForRAG-${moduleId}`, this.moduleName);
+        logger.notice(this.moduleName, 'PDF processing completed successfully', {
+          moduleId,
+          fileName: pdfFile.name,
+          totalChunks: allChunks.length,
+          totalDuration: `${duration?.toFixed(2)}ms`
+        });
+
+        // Check performance threshold
+        if (LogConfig.features?.logPerformance && duration > (LogConfig.performanceThresholds?.pdfProcessing || 10000)) {
+          logger.warn(this.moduleName, 'PDF processing exceeded performance threshold', {
+            moduleId,
+            duration: `${duration?.toFixed(2)}ms`,
+            threshold: `${LogConfig.performanceThresholds?.pdfProcessing}ms`
+          });
+        }
+      }
+    } catch (error) {
+      if (window.logger) {
+        logger.error(this.moduleName, 'Failed to save module content', {
+          moduleId,
+          error: error.message
+        });
+      }
+      throw error;
+    }
 
     return moduleContent;
   }
@@ -142,6 +220,16 @@ class RAGEngine {
     const moduleId = options.moduleId;
     const minScore = options.minScore || 0.3;
 
+    if (window.logger) {
+      logger.perfStart('retrieveRelevantChunks');
+      logger.info(this.moduleName, 'Retrieving relevant chunks', {
+        query: query.substring(0, 50),
+        topK,
+        moduleId: moduleId || 'all',
+        minScore
+      });
+    }
+
     // Generate embedding for query
     const queryEmbedding = await aiService.generateEmbedding(query);
 
@@ -149,6 +237,13 @@ class RAGEngine {
     let searchChunks = this.chunks;
     if (moduleId) {
       searchChunks = this.chunks.filter(c => c.moduleId === moduleId);
+    }
+
+    if (window.logger) {
+      logger.debug(this.moduleName, 'Searching chunks', {
+        totalChunks: searchChunks.length,
+        chunksWithEmbeddings: searchChunks.filter(c => c.embedding).length
+      });
     }
 
     // Calculate similarities
@@ -162,22 +257,56 @@ class RAGEngine {
       .sort((a, b) => b.score - a.score)
       .slice(0, topK);
 
-    return scores.map(item => ({
+    const results = scores.map(item => ({
       ...item.chunk,
       relevanceScore: item.score
     }));
+
+    if (window.logger) {
+      const duration = logger.perfEnd('retrieveRelevantChunks', this.moduleName);
+      logger.info(this.moduleName, 'Chunk retrieval completed', {
+        matchesFound: results.length,
+        topScore: results[0]?.relevanceScore?.toFixed(3) || 0,
+        duration: `${duration?.toFixed(2)}ms`
+      });
+    }
+
+    return results;
   }
 
   // Generate a question based on module content
   async generateQuestion(moduleId, difficulty, previousTopics = []) {
+    if (window.logger) {
+      logger.info(this.moduleName, 'Generating question from module', {
+        moduleId,
+        difficulty,
+        previousTopicsCount: previousTopics.length
+      });
+    }
+
     // Load module if not in memory
     if (!this.moduleData[moduleId]) {
+      if (window.logger) {
+        logger.debug(this.moduleName, 'Module not in memory, loading from storage', { moduleId });
+      }
+
       const data = await firebaseService.getContent(moduleId);
       if (data) {
         this.moduleData[moduleId] = data;
         this.chunks = data.chunks || [];
+
+        if (window.logger) {
+          logger.info(this.moduleName, 'Module loaded from storage', {
+            moduleId,
+            chunksLoaded: this.chunks.length
+          });
+        }
       } else {
-        throw new Error(`Module ${moduleId} not found`);
+        const error = `Module ${moduleId} not found`;
+        if (window.logger) {
+          logger.error(this.moduleName, error);
+        }
+        throw new Error(error);
       }
     }
 
@@ -186,12 +315,34 @@ class RAGEngine {
       .filter(c => c.moduleId === moduleId && c.type === 'text' && c.mathScore > 0.3)
       .filter(c => !previousTopics.includes(c.topic)); // Avoid repetition
 
+    if (window.logger) {
+      logger.debug(this.moduleName, 'Filtered chunks for question generation', {
+        moduleId,
+        availableChunks: moduleChunks.length,
+        minMathScore: 0.3,
+        excludedTopics: previousTopics
+      });
+    }
+
     if (moduleChunks.length === 0) {
-      throw new Error('No suitable content found for question generation');
+      const error = 'No suitable content found for question generation';
+      if (window.logger) {
+        logger.error(this.moduleName, error, { moduleId, difficulty });
+      }
+      throw new Error(error);
     }
 
     // Pick a random chunk weighted by math score
     const selectedChunk = this._weightedRandomPick(moduleChunks, 'mathScore');
+
+    if (window.logger) {
+      logger.debug(this.moduleName, 'Selected chunk for question', {
+        moduleId,
+        topic: selectedChunk.topic,
+        mathScore: selectedChunk.mathScore,
+        pageNumber: selectedChunk.pageNumber
+      });
+    }
 
     // Generate question using AI
     const question = await aiService.generateQuestion(
@@ -200,7 +351,7 @@ class RAGEngine {
       selectedChunk.topic
     );
 
-    return {
+    const result = {
       ...question,
       topic: selectedChunk.topic,
       moduleId,
@@ -208,6 +359,18 @@ class RAGEngine {
       sourceChunk: selectedChunk.content.substring(0, 200) + '...',
       pageNumber: selectedChunk.pageNumber
     };
+
+    if (window.logger) {
+      logger.notice(this.moduleName, 'Question generated successfully', {
+        moduleId,
+        topic: result.topic,
+        difficulty,
+        pageNumber: result.pageNumber,
+        isGenerated: result.generated
+      });
+    }
+
+    return result;
   }
 
   _weightedRandomPick(items, weightKey) {
