@@ -72,8 +72,7 @@ algebra2_tutor_clean/
 │   ├── ai-service.js       # HuggingFace API integration
 │   ├── rag-engine.js       # RAG system & embeddings
 │   └── session-manager.js  # Adaptive sessions & analytics
-├── SETUP.md                # Detailed setup instructions
-└── CLAUDE.md               # Development guide for AI assistants
+└── SETUP.md                # Detailed setup instructions
 ```
 
 ## 🛠️ Technology Stack
@@ -212,7 +211,8 @@ MIT License - free to use, modify, and distribute.
 ## 📚 Documentation
 
 - [SETUP.md](SETUP.md) - Complete setup instructions
-- [CLAUDE.md](CLAUDE.md) - Development guide for AI assistants
+- [LOGGING_GUIDE.md](LOGGING_GUIDE.md) - Logging system documentation
+- [API_KEY_SETUP.md](API_KEY_SETUP.md) - Secure API key configuration
 - Open `test.html` for code examples
 
 ---
