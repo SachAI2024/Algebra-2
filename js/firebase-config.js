@@ -17,8 +17,25 @@ class FirebaseService {
     this.storage = null;
   }
 
+  isConfigured() {
+    // Check if Firebase config has been customized
+    return firebaseConfig.apiKey !== "YOUR_API_KEY" &&
+           firebaseConfig.projectId !== "YOUR_PROJECT_ID";
+  }
+
   async init() {
     if (this.initialized) return;
+
+    // Check if Firebase is configured
+    if (!this.isConfigured()) {
+      console.warn('Firebase not configured. Using localStorage only.');
+      if (window.logger) {
+        logger.notice('FirebaseService', 'Firebase not configured, using localStorage fallback');
+      }
+      this.useFallback = true;
+      this.initialized = true;
+      return;
+    }
 
     try {
       // Initialize Firebase (assumes Firebase SDK loaded via CDN)
@@ -30,11 +47,23 @@ class FirebaseService {
       this.db = firebase.firestore();
       this.storage = firebase.storage();
       this.initialized = true;
+
+      if (window.logger) {
+        logger.info('FirebaseService', 'Firebase initialized successfully', {
+          projectId: firebaseConfig.projectId
+        });
+      }
       console.log('Firebase initialized successfully');
     } catch (error) {
       console.error('Firebase initialization failed:', error);
+      if (window.logger) {
+        logger.warn('FirebaseService', 'Firebase initialization failed, using localStorage fallback', {
+          error: error.message
+        });
+      }
       // Fallback to localStorage if Firebase fails
       this.useFallback = true;
+      this.initialized = true;
     }
   }
 
