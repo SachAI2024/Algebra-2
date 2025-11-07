@@ -100,6 +100,192 @@
       color: #fff;
       font-size: 14px;
     }
+
+    /* Debug Modal Styles */
+    .debug-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      overflow-y: auto;
+      padding: 20px;
+    }
+    .debug-modal.active {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+    }
+    .debug-content {
+      background: #0a0f1a;
+      border-radius: 16px;
+      max-width: 900px;
+      width: 100%;
+      margin: 40px auto;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      border: 1px solid #1a2332;
+    }
+    .debug-header {
+      padding: 24px;
+      border-bottom: 1px solid #1a2332;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .debug-header h2 {
+      margin: 0;
+      font-size: 20px;
+      color: #667eea;
+    }
+    .debug-close {
+      background: none;
+      border: none;
+      color: #9ca3af;
+      font-size: 24px;
+      cursor: pointer;
+      padding: 4px 8px;
+      line-height: 1;
+    }
+    .debug-close:hover {
+      color: #fff;
+    }
+    .debug-body {
+      padding: 24px;
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+    .debug-section {
+      background: #0f1623;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      border-left: 4px solid #374151;
+    }
+    .debug-section.active {
+      border-left-color: #667eea;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    .debug-section.complete {
+      border-left-color: #10b981;
+    }
+    .debug-section.error {
+      border-left-color: #ef4444;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    .debug-section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .debug-section-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .debug-icon {
+      width: 20px;
+      height: 20px;
+      display: inline-block;
+    }
+    .debug-timer {
+      font-size: 12px;
+      color: #9ca3af;
+      font-family: monospace;
+    }
+    .debug-details {
+      font-size: 13px;
+      color: #9ca3af;
+      line-height: 1.6;
+      font-family: 'Courier New', monospace;
+    }
+    .debug-metric {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid #1a2332;
+    }
+    .debug-metric:last-child {
+      border-bottom: none;
+    }
+    .debug-metric-label {
+      color: #6b7280;
+    }
+    .debug-metric-value {
+      color: #fff;
+      font-weight: 600;
+    }
+    .debug-progress {
+      width: 100%;
+      height: 6px;
+      background: #1a2332;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .debug-progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea, #764ba2);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+    .debug-log {
+      background: #000;
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+    .debug-log-entry {
+      color: #9ca3af;
+      margin: 2px 0;
+    }
+    .debug-log-entry.info {
+      color: #60a5fa;
+    }
+    .debug-log-entry.success {
+      color: #10b981;
+    }
+    .debug-log-entry.warning {
+      color: #fbbf24;
+    }
+    .debug-log-entry.error {
+      color: #ef4444;
+    }
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid #374151;
+      border-top-color: #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .checkmark {
+      color: #10b981;
+      font-size: 20px;
+    }
+    .errormark {
+      color: #ef4444;
+      font-size: 20px;
+    }
   </style>
 </head>
 <body>
@@ -174,6 +360,19 @@
   </div>
 </main>
 
+<!-- Debug Modal -->
+<div class="debug-modal" id="debugModal">
+  <div class="debug-content">
+    <div class="debug-header">
+      <h2>🔬 Processing Debug View</h2>
+      <button class="debug-close" id="debugClose">×</button>
+    </div>
+    <div class="debug-body" id="debugBody">
+      <!-- Sections will be dynamically added here -->
+    </div>
+  </div>
+</div>
+
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
@@ -236,6 +435,136 @@
     }
 
     console.log('aiService loaded successfully');
+
+  // Debug Modal Elements
+  const debugModal = document.getElementById('debugModal');
+  const debugBody = document.getElementById('debugBody');
+  const debugClose = document.getElementById('debugClose');
+
+  // Debug Modal Controller
+  const DebugModal = {
+    sections: {},
+    logs: {},
+
+    open() {
+      debugModal.classList.add('active');
+      debugBody.innerHTML = '';
+      this.sections = {};
+      this.logs = {};
+    },
+
+    close() {
+      debugModal.classList.remove('active');
+    },
+
+    addSection(id, title, icon = '📋') {
+      const section = document.createElement('div');
+      section.className = 'debug-section';
+      section.id = `debug-section-${id}`;
+      section.innerHTML = `
+        <div class="debug-section-header">
+          <div class="debug-section-title">
+            <span class="debug-icon">${icon}</span>
+            ${title}
+            <span class="spinner" id="spinner-${id}"></span>
+          </div>
+          <span class="debug-timer" id="timer-${id}">0.0s</span>
+        </div>
+        <div class="debug-details" id="details-${id}">
+          <div class="debug-metric">
+            <span class="debug-metric-label">Status</span>
+            <span class="debug-metric-value" id="status-${id}">Pending...</span>
+          </div>
+        </div>
+        <div class="debug-progress">
+          <div class="debug-progress-bar" id="progress-${id}"></div>
+        </div>
+        <div class="debug-log" id="log-${id}"></div>
+      `;
+      debugBody.appendChild(section);
+
+      this.sections[id] = {
+        element: section,
+        startTime: null,
+        timerInterval: null
+      };
+      this.logs[id] = [];
+    },
+
+    startSection(id) {
+      const section = document.getElementById(`debug-section-${id}`);
+      if (section) {
+        section.classList.add('active');
+        section.classList.remove('complete', 'error');
+      }
+
+      this.sections[id].startTime = Date.now();
+      this.sections[id].timerInterval = setInterval(() => {
+        const elapsed = (Date.now() - this.sections[id].startTime) / 1000;
+        const timer = document.getElementById(`timer-${id}`);
+        if (timer) timer.textContent = elapsed.toFixed(1) + 's';
+      }, 100);
+
+      document.getElementById(`spinner-${id}`).style.display = 'inline-block';
+    },
+
+    completeSection(id, success = true) {
+      const section = document.getElementById(`debug-section-${id}`);
+      if (section) {
+        section.classList.remove('active');
+        section.classList.add(success ? 'complete' : 'error');
+      }
+
+      if (this.sections[id].timerInterval) {
+        clearInterval(this.sections[id].timerInterval);
+      }
+
+      const spinner = document.getElementById(`spinner-${id}`);
+      if (spinner) {
+        spinner.style.display = 'none';
+        const icon = success ? '✓' : '✗';
+        const className = success ? 'checkmark' : 'errormark';
+        spinner.insertAdjacentHTML('afterend', `<span class="${className}">${icon}</span>`);
+      }
+    },
+
+    updateStatus(id, status) {
+      const statusEl = document.getElementById(`status-${id}`);
+      if (statusEl) statusEl.textContent = status;
+    },
+
+    addMetric(id, label, value) {
+      const details = document.getElementById(`details-${id}`);
+      if (details) {
+        const metric = document.createElement('div');
+        metric.className = 'debug-metric';
+        metric.innerHTML = `
+          <span class="debug-metric-label">${label}</span>
+          <span class="debug-metric-value">${value}</span>
+        `;
+        details.appendChild(metric);
+      }
+    },
+
+    updateProgress(id, percent) {
+      const progress = document.getElementById(`progress-${id}`);
+      if (progress) progress.style.width = percent + '%';
+    },
+
+    addLog(id, message, type = 'info') {
+      this.logs[id].push({ message, type, time: new Date().toLocaleTimeString() });
+      const logEl = document.getElementById(`log-${id}`);
+      if (logEl) {
+        const entry = document.createElement('div');
+        entry.className = `debug-log-entry ${type}`;
+        entry.textContent = `[${this.logs[id][this.logs[id].length - 1].time}] ${message}`;
+        logEl.appendChild(entry);
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+    }
+  };
+
+  debugClose.onclick = () => DebugModal.close();
 
   // Initialize
   async function init() {
@@ -354,6 +683,16 @@
       alert(`Warning: File size is ${fileSizeMB.toFixed(1)}MB. Large files may take several minutes to process.`);
     }
 
+    // Open debug modal
+    DebugModal.open();
+
+    // Initialize debug sections
+    DebugModal.addSection('upload', '📤 Firebase Upload', '📤');
+    DebugModal.addSection('extraction', '📄 PDF Extraction', '📄');
+    DebugModal.addSection('chunking', '✂️ Text Chunking', '✂️');
+    DebugModal.addSection('embeddings', '🧠 Embedding Generation', '🧠');
+    DebugModal.addSection('storage', '💾 Data Storage', '💾');
+
     try {
       // Show progress
       progressContainer.style.display = 'block';
@@ -368,26 +707,167 @@
         });
       }
 
-      // Upload to Firebase (run in parallel with processing)
-      setProgress(10, 'Uploading to cloud storage...');
-      const uploadPromise = firebaseService.uploadPDF(file, moduleId).catch(err => {
-        console.warn('Firebase upload failed, continuing with processing:', err);
-        return null; // Non-blocking failure
-      });
+      // === STEP 1: Upload to Firebase ===
+      DebugModal.startSection('upload');
+      DebugModal.updateStatus('upload', 'Uploading to Firebase Storage...');
+      DebugModal.addMetric('upload', 'File Name', file.name);
+      DebugModal.addMetric('upload', 'File Size', `${fileSizeMB.toFixed(2)} MB`);
+      DebugModal.addMetric('upload', 'Module ID', moduleId);
+      DebugModal.addLog('upload', 'Starting Firebase upload', 'info');
 
-      // Process PDF for RAG (this is the slow part)
+      setProgress(10, 'Uploading to cloud storage...');
+      const uploadPromise = firebaseService.uploadPDF(file, moduleId)
+        .then(() => {
+          DebugModal.addLog('upload', 'Firebase upload completed successfully', 'success');
+          DebugModal.completeSection('upload', true);
+          return true;
+        })
+        .catch(err => {
+          DebugModal.addLog('upload', `Firebase upload failed: ${err.message}`, 'error');
+          DebugModal.addLog('upload', 'Continuing with local storage fallback', 'warning');
+          DebugModal.completeSection('upload', false);
+          console.warn('Firebase upload failed, continuing with processing:', err);
+          return null;
+        });
+
+      // === STEP 2: PDF Extraction ===
+      DebugModal.startSection('extraction');
+      DebugModal.updateStatus('extraction', 'Extracting content from PDF...');
+      DebugModal.addLog('extraction', 'Initializing PDF.js parser', 'info');
+
       setProgress(20, 'Extracting content from PDF...');
       const startTime = performance.now();
 
-      // Process with RAG - this includes extraction, chunking, and embedding
-      const moduleData = await ragEngine.processPDFForRAG(file, moduleId);
+      const pdfData = await pdfProcessor.processPDF(file, {
+        extractText: true,
+        extractImages: true
+      });
 
-      const processingTime = ((performance.now() - startTime) / 1000).toFixed(1);
-      setProgress(85, `Content processed in ${processingTime}s. Finalizing...`);
+      const extractionTime = ((performance.now() - startTime) / 1000).toFixed(2);
+      DebugModal.addMetric('extraction', 'Pages Extracted', pdfData.numPages);
+      DebugModal.addMetric('extraction', 'Text Length', `${pdfData.pages.map(p => p.text).join('').length.toLocaleString()} chars`);
+      DebugModal.addMetric('extraction', 'Extraction Time', `${extractionTime}s`);
+      DebugModal.addLog('extraction', `Extracted ${pdfData.numPages} pages successfully`, 'success');
+      DebugModal.completeSection('extraction', true);
 
-      // Wait for upload to complete (if still running)
+      // === STEP 3: Text Chunking ===
+      DebugModal.startSection('chunking');
+      DebugModal.updateStatus('chunking', 'Chunking text into segments...');
+      DebugModal.addLog('chunking', 'Combining text from all pages', 'info');
+
+      setProgress(30, 'Chunking text...');
+      const fullText = pdfData.pages.map(p => p.text).join('\n\n');
+
+      DebugModal.addLog('chunking', `Total text length: ${fullText.length} characters`, 'info');
+      DebugModal.addLog('chunking', 'Splitting into 800-char chunks with 100-char overlap', 'info');
+
+      const textChunks = pdfProcessor.chunkText(fullText, {
+        maxChunkSize: 800,
+        overlap: 100
+      });
+
+      const avgChunkSize = Math.round(textChunks.reduce((sum, c) => sum + c.length, 0) / textChunks.length);
+      DebugModal.addMetric('chunking', 'Total Chunks', textChunks.length);
+      DebugModal.addMetric('chunking', 'Avg Chunk Size', `${avgChunkSize} chars`);
+      DebugModal.addMetric('chunking', 'Config', 'maxSize:800, overlap:100');
+      DebugModal.addLog('chunking', `Created ${textChunks.length} text chunks`, 'success');
+      DebugModal.completeSection('chunking', true);
+
+      // === STEP 4: Embedding Generation (SLOWEST) ===
+      DebugModal.startSection('embeddings');
+      DebugModal.updateStatus('embeddings', 'Generating vector embeddings...');
+      DebugModal.addLog('embeddings', 'Starting batch embedding generation', 'info');
+      DebugModal.addLog('embeddings', `Processing ${textChunks.length} chunks in batches of 5`, 'info');
+      DebugModal.addMetric('embeddings', 'Model', aiService.embeddingModel);
+      DebugModal.addMetric('embeddings', 'Batch Size', '5 chunks/batch');
+      DebugModal.addMetric('embeddings', 'Total Batches', Math.ceil(textChunks.length / 5));
+
+      setProgress(40, 'Generating embeddings (this may take a while)...');
+      const embeddingStartTime = performance.now();
+
+      // Generate embeddings with progress tracking
+      const embeddings = [];
+      for (let i = 0; i < textChunks.length; i += 5) {
+        const batch = textChunks.slice(i, i + 5);
+        const batchNum = Math.floor(i / 5) + 1;
+        const totalBatches = Math.ceil(textChunks.length / 5);
+
+        DebugModal.addLog('embeddings', `Processing batch ${batchNum}/${totalBatches} (chunks ${i + 1}-${Math.min(i + 5, textChunks.length)})`, 'info');
+        DebugModal.updateProgress('embeddings', (batchNum / totalBatches) * 100);
+
+        const batchResults = await Promise.all(
+          batch.map(text => aiService.generateEmbedding(text))
+        );
+        embeddings.push(...batchResults);
+
+        const progress = 40 + (batchNum / totalBatches) * 40;
+        setProgress(progress, `Embeddings: ${batchNum}/${totalBatches} batches...`);
+
+        // Delay between batches (rate limiting)
+        if (i + 5 < textChunks.length) {
+          DebugModal.addLog('embeddings', 'Waiting 1s (rate limit)...', 'warning');
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      const embeddingTime = ((performance.now() - embeddingStartTime) / 1000).toFixed(2);
+      const avgTimePerBatch = (embeddingTime / Math.ceil(textChunks.length / 5)).toFixed(2);
+      DebugModal.addMetric('embeddings', 'Embeddings Generated', embeddings.length);
+      DebugModal.addMetric('embeddings', 'Dimensions', embeddings[0]?.length || 0);
+      DebugModal.addMetric('embeddings', 'Total Time', `${embeddingTime}s`);
+      DebugModal.addMetric('embeddings', 'Avg Time/Batch', `${avgTimePerBatch}s`);
+      DebugModal.addLog('embeddings', `All embeddings generated successfully in ${embeddingTime}s`, 'success');
+      DebugModal.completeSection('embeddings', true);
+
+      // === STEP 5: Storage ===
+      DebugModal.startSection('storage');
+      DebugModal.updateStatus('storage', 'Saving processed data...');
+      DebugModal.addLog('storage', 'Preparing module content for storage', 'info');
+
+      setProgress(85, 'Saving to database...');
+
+      // Create module content
+      const allChunks = textChunks.map((text, idx) => ({
+        type: 'text',
+        content: text,
+        embedding: embeddings[idx],
+        moduleId,
+        pageNumber: Math.floor(idx / (textChunks.length / pdfData.numPages)) + 1,
+        topic: aiService.extractTopic(text),
+        mathScore: pdfProcessor.identifyMathContent(text).confidence
+      }));
+
+      const moduleContent = {
+        moduleId,
+        fileName: file.name,
+        processedAt: Date.now(),
+        chunks: allChunks,
+        metadata: pdfData.metadata,
+        stats: {
+          totalChunks: allChunks.length,
+          textChunks: textChunks.length,
+          imageChunks: 0,
+          totalPages: pdfData.numPages
+        }
+      };
+
+      DebugModal.addLog('storage', `Saving ${allChunks.length} chunks to storage`, 'info');
+
+      // Save to storage
+      ragEngine.chunks = allChunks;
+      ragEngine.embeddings = embeddings;
+      ragEngine.moduleData[moduleId] = moduleContent;
+
+      await firebaseService.saveContent(moduleId, moduleContent);
+
+      const totalTime = ((performance.now() - startTime) / 1000).toFixed(1);
+      DebugModal.addMetric('storage', 'Data Size', `${JSON.stringify(moduleContent).length.toLocaleString()} bytes`);
+      DebugModal.addMetric('storage', 'Storage Location', 'Firebase + localStorage');
+      DebugModal.addLog('storage', 'Module content saved successfully', 'success');
+      DebugModal.completeSection('storage', true);
+
+      // Wait for upload to complete
       await uploadPromise;
-      setProgress(95, 'Saving to database...');
 
       // Complete
       setProgress(100, '✓ Module uploaded successfully!');
@@ -396,11 +876,18 @@
         logger.notice('UploadPage', 'PDF upload and processing completed', {
           fileName: file.name,
           moduleId,
-          totalChunks: moduleData.stats?.totalChunks,
-          totalPages: moduleData.stats?.totalPages,
-          processingTime: `${processingTime}s`
+          totalChunks: moduleContent.stats.totalChunks,
+          totalPages: moduleContent.stats.totalPages,
+          totalTime: `${totalTime}s`,
+          embeddingTime: `${embeddingTime}s`
         });
       }
+
+      // Add success summary to debug modal
+      const summarySection = document.createElement('div');
+      summarySection.style.cssText = 'background: #10b981; color: #000; padding: 16px; border-radius: 12px; margin-top: 16px; text-align: center; font-weight: 600;';
+      summarySection.innerHTML = `✓ Processing Complete! Total time: ${totalTime}s`;
+      debugBody.appendChild(summarySection);
 
       // Reset
       setTimeout(() => {
@@ -414,6 +901,17 @@
     } catch (error) {
       console.error('Upload error:', error);
 
+      // Mark current section as error
+      const activeSections = ['upload', 'extraction', 'chunking', 'embeddings', 'storage'];
+      activeSections.forEach(section => {
+        const el = document.getElementById(`debug-section-${section}`);
+        if (el && el.classList.contains('active')) {
+          DebugModal.addLog(section, `ERROR: ${error.message}`, 'error');
+          DebugModal.addLog(section, error.stack || 'No stack trace available', 'error');
+          DebugModal.completeSection(section, false);
+        }
+      });
+
       if (window.logger) {
         logger.error('UploadPage', 'PDF upload failed', {
           fileName: file.name,
@@ -425,6 +923,19 @@
       statusEl.textContent = '❌ Error: ' + error.message;
       statusEl.style.color = '#ef4444';
       progressContainer.style.display = 'none';
+
+      // Add error summary to debug modal
+      const errorSection = document.createElement('div');
+      errorSection.style.cssText = 'background: #ef4444; color: #fff; padding: 16px; border-radius: 12px; margin-top: 16px;';
+      errorSection.innerHTML = `
+        <div style="font-weight: 600; margin-bottom: 8px;">✗ Processing Failed</div>
+        <div style="font-size: 13px; font-family: monospace;">${error.message}</div>
+        <div style="margin-top: 12px; font-size: 12px;">
+          <strong>Troubleshooting:</strong><br>
+          ${error.message.includes('API') ? '• Check your API key configuration<br>• Verify internet connection<br>• Check HuggingFace API status' : '• Check browser console for details<br>• Try a smaller PDF first<br>• Verify PDF is not corrupted'}
+        </div>
+      `;
+      debugBody.appendChild(errorSection);
 
       // Show user-friendly error message
       let errorMsg = 'Upload failed: ' + error.message;
