@@ -443,6 +443,10 @@
     }
 
     console.log('aiService loaded successfully');
+    if (!aiService.getProxyURL()) {
+      statusEl.textContent = 'ℹ️ Proxy required: set Embedding Proxy URL (see README).';
+      statusEl.style.color = '#fbbf24';
+    }
 
   // Debug Modal Elements
   const debugModal = document.getElementById('debugModal');
