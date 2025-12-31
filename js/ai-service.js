@@ -66,20 +66,9 @@ class AIService {
     return this.proxyUrl;
   }
 
-  _requiresProxy() {
-    return typeof window !== 'undefined';
-  }
-
   async _callAPI(model, payload, retries = 3) {
     const apiKey = this.getAPIKey();
     const proxyUrl = this.getProxyURL();
-    if (!proxyUrl && this._requiresProxy()) {
-      const error = new Error('Browser requests to Hugging Face need a proxy. Configure the Embedding Proxy URL in settings (see README).');
-      if (window.logger) {
-        logger.error(this.moduleName, 'Proxy URL missing', { model });
-      }
-      throw error;
-    }
     if (!apiKey && !proxyUrl) {
       const error = new Error('HuggingFace API key not set. Please configure in settings or add a proxy URL.');
       if (window.logger) {

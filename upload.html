@@ -599,9 +599,6 @@
         proxyUrlInput.value = savedProxy;
         statusEl.textContent = '✓ Proxy configured';
         statusEl.style.color = '#10b981';
-      } else if (!savedProxy) {
-        statusEl.textContent = '⚠️ Hugging Face blocks browser calls. Configure the Embedding Proxy URL below.';
-        statusEl.style.color = '#fbbf24';
       }
 
       loadModules();
@@ -656,10 +653,6 @@
         statusEl.textContent = '❌ Failed to save configuration';
         statusEl.style.color = '#ef4444';
         console.error('Configuration save verification failed');
-      }
-
-      if (!proxyUrl) {
-        alert('Embedding Proxy URL is still empty. Hugging Face blocks browser calls, so embeddings will fail until you set a proxy (see README).');
       }
 
       setTimeout(() => {

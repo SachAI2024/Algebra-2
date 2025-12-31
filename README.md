@@ -142,8 +142,6 @@ Then in `upload.html`:
 2. Enter `http://localhost:8787/api/inference`.
 3. Save configuration (API key optional when proxy has HF_API_KEY set).
 
-**Important:** Browsers served over HTTPS (like GitHub Pages) will still block requests if you leave the proxy URL empty. Always configure the proxy before uploading PDFs to generate embeddings.
-
 ### Run Tests
 
 Open `test.html` in browser to see unit test results.
