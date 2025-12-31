@@ -9,6 +9,7 @@ class AIService {
     this.visionModel = 'llava-hf/llava-1.5-7b-hf'; // For image analysis
     this.embeddingModel = 'sentence-transformers/all-MiniLM-L6-v2';
     this.moduleName = 'AIService';
+    this.proxyUrl = '';
 
     if (window.logger) {
       logger.info(this.moduleName, 'AIService initialized', {
@@ -42,10 +43,34 @@ class AIService {
     return this.apiKey;
   }
 
+  setProxyURL(url) {
+    this.proxyUrl = url;
+    localStorage.setItem('hf_proxy_url', url);
+    if (window.logger) {
+      logger.info(this.moduleName, 'Proxy URL configured', {
+        hasProxy: !!url,
+        proxyHost: url ? new URL(url).host : null
+      });
+    }
+  }
+
+  getProxyURL() {
+    if (!this.proxyUrl) {
+      this.proxyUrl = localStorage.getItem('hf_proxy_url') || '';
+      if (window.logger) {
+        logger.debug(this.moduleName, 'Proxy URL loaded from localStorage', {
+          hasProxy: !!this.proxyUrl
+        });
+      }
+    }
+    return this.proxyUrl;
+  }
+
   async _callAPI(model, payload, retries = 3) {
     const apiKey = this.getAPIKey();
-    if (!apiKey) {
-      const error = new Error('HuggingFace API key not set. Please configure in settings.');
+    const proxyUrl = this.getProxyURL();
+    if (!apiKey && !proxyUrl) {
+      const error = new Error('HuggingFace API key not set. Please configure in settings or add a proxy URL.');
       if (window.logger) {
         logger.error(this.moduleName, 'API key missing', { model });
       }
@@ -53,12 +78,13 @@ class AIService {
     }
 
     const startTime = performance.now();
-    const endpoint = this.baseURL + model;
+    const endpoint = proxyUrl ? proxyUrl : this.baseURL + model;
+    const requestBody = proxyUrl ? { model, payload } : payload;
 
     if (window.logger) {
       logger.logAPICall(this.moduleName, endpoint, 'POST', {
         model,
-        payloadSize: JSON.stringify(payload).length,
+        payloadSize: JSON.stringify(requestBody).length,
         retries
       });
     }
@@ -72,10 +98,10 @@ class AIService {
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${apiKey}`,
+            ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {}),
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(requestBody)
         });
 
         const duration = performance.now() - startTime;
@@ -140,6 +166,9 @@ class AIService {
               error: error.message,
               duration: `${(performance.now() - startTime).toFixed(2)}ms`
             });
+          }
+          if (error.message.includes('Failed to fetch') && !this.getProxyURL()) {
+            error = new Error('Network/CORS error calling Hugging Face. Configure the proxy URL in settings to bypass browser restrictions.');
           }
           throw error;
         }
