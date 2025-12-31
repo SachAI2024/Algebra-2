@@ -128,6 +128,20 @@ npx http-server -p 8000
 
 Open `http://localhost:8000`
 
+### Avoid CORS issues with Hugging Face
+
+Hugging Face's Inference API does not send CORS headers, so direct browser calls from GitHub Pages will fail with `Failed to fetch`. Run the included proxy locally and point the Upload page at it:
+
+```bash
+HF_API_KEY=your_hf_key node proxy-server.js
+# Proxy listens on http://localhost:8787/api/inference by default
+```
+
+Then in `upload.html`:
+1. Open the **Embedding Proxy URL** field.
+2. Enter `http://localhost:8787/api/inference`.
+3. Save configuration (API key optional when proxy has HF_API_KEY set).
+
 ### Run Tests
 
 Open `test.html` in browser to see unit test results.

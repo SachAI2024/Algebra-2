@@ -311,6 +311,13 @@
         <a href="https://huggingface.co/settings/tokens" target="_blank" style="color: #667eea;">huggingface.co/settings/tokens</a>
       </div>
     </div>
+    <div class="form-group">
+      <label for="proxyUrl">Embedding Proxy URL (optional)</label>
+      <input type="url" id="proxyUrl" placeholder="http://localhost:8787/api/inference" />
+      <div class="tiny muted" style="margin-top: 4px;">
+        Hugging Face blocks browser calls; run the local proxy server and paste its URL to avoid CORS errors.
+      </div>
+    </div>
     <button class="btn primary" id="saveConfig">Save Configuration</button>
   </div>
 
@@ -408,6 +415,7 @@
     const statusEl = document.getElementById('status');
     const modulesListEl = document.getElementById('modulesList');
     const apiKeyInput = document.getElementById('apiKey');
+    const proxyUrlInput = document.getElementById('proxyUrl');
     const saveConfigBtn = document.getElementById('saveConfig');
 
     // Verify critical elements exist
@@ -576,9 +584,16 @@
       // Load saved API key
       const savedKey = aiService.getAPIKey();
       console.log('Saved API key:', savedKey ? '(exists)' : '(none)');
+      const savedProxy = aiService.getProxyURL();
+      console.log('Saved proxy URL:', savedProxy ? savedProxy : '(none)');
       if (savedKey) {
         apiKeyInput.value = savedKey;
         statusEl.textContent = '✓ API key configured';
+        statusEl.style.color = '#10b981';
+      }
+      if (savedProxy && proxyUrlInput) {
+        proxyUrlInput.value = savedProxy;
+        statusEl.textContent = '✓ Proxy configured';
         statusEl.style.color = '#10b981';
       }
 
@@ -595,33 +610,45 @@
     console.log('Save config button clicked');
     try {
       const key = apiKeyInput.value.trim();
+      const proxyUrl = proxyUrlInput?.value.trim();
       console.log('API key length:', key.length);
 
-      if (!key) {
-        alert('Please enter your HuggingFace API key');
+      if (!key && !proxyUrl) {
+        alert('Please enter your HuggingFace API key or configure a proxy');
         return;
       }
 
-      if (!key.startsWith('hf_')) {
+      if (key && !key.startsWith('hf_')) {
         const proceed = confirm('Warning: HuggingFace API keys usually start with "hf_". Continue anyway?');
         if (!proceed) return;
       }
 
       console.log('Saving API key...');
-      aiService.setAPIKey(key);
+      if (key) {
+        aiService.setAPIKey(key);
+      }
+      if (proxyUrl) {
+        aiService.setProxyURL(proxyUrl);
+      } else {
+        aiService.setProxyURL('');
+      }
 
       // Verify it was saved
       const savedKey = localStorage.getItem('hf_api_key');
+      const savedProxy = localStorage.getItem('hf_proxy_url');
       console.log('Verification - saved to localStorage:', savedKey === key ? 'SUCCESS' : 'FAILED');
+      if (proxyUrl) {
+        console.log('Proxy URL saved:', savedProxy === proxyUrl ? 'SUCCESS' : 'FAILED');
+      }
 
-      if (savedKey === key) {
+      if ((key && savedKey === key) || (!key && savedProxy === proxyUrl)) {
         statusEl.textContent = '✓ Configuration saved successfully!';
         statusEl.style.color = '#10b981';
-        console.log('API key saved successfully');
+        console.log('Configuration saved successfully');
       } else {
         statusEl.textContent = '❌ Failed to save configuration';
         statusEl.style.color = '#ef4444';
-        console.error('API key save verification failed');
+        console.error('Configuration save verification failed');
       }
 
       setTimeout(() => {
@@ -672,8 +699,8 @@
   async function processFile(file) {
     const moduleId = moduleIdInput.value.trim() || `module-${Date.now()}`;
 
-    if (!aiService.getAPIKey()) {
-      alert('Please configure your HuggingFace API key first');
+    if (!aiService.getAPIKey() && !aiService.getProxyURL()) {
+      alert('Please configure your HuggingFace API key or proxy first');
       return;
     }
 
