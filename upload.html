@@ -311,6 +311,17 @@
         <a href="https://huggingface.co/settings/tokens" target="_blank" style="color: #667eea;">huggingface.co/settings/tokens</a>
       </div>
     </div>
+    <div class="form-group">
+      <label for="proxyUrl">Embedding Proxy URL (optional)</label>
+      <input type="url" id="proxyUrl" placeholder="http://localhost:8787/api/inference" />
+      <div class="tiny muted" style="margin-top: 4px;">
+        Hugging Face blocks browser calls; run the local proxy server and paste its URL to avoid CORS errors.
+      </div>
+      <div class="row" style="align-items: center; gap: 10px; margin-top: 8px;">
+        <button class="btn ghost" type="button" id="testProxy">Check proxy</button>
+        <span id="proxyStatus" class="tiny muted">Proxy status: not checked</span>
+      </div>
+    </div>
     <button class="btn primary" id="saveConfig">Save Configuration</button>
   </div>
 
@@ -408,6 +419,9 @@
     const statusEl = document.getElementById('status');
     const modulesListEl = document.getElementById('modulesList');
     const apiKeyInput = document.getElementById('apiKey');
+    const proxyUrlInput = document.getElementById('proxyUrl');
+    const proxyStatusEl = document.getElementById('proxyStatus');
+    const testProxyBtn = document.getElementById('testProxy');
     const saveConfigBtn = document.getElementById('saveConfig');
 
     // Verify critical elements exist
@@ -435,6 +449,10 @@
     }
 
     console.log('aiService loaded successfully');
+    if (!aiService.getProxyURL()) {
+      statusEl.textContent = 'ℹ️ Proxy required: set Embedding Proxy URL (see README).';
+      statusEl.style.color = '#fbbf24';
+    }
 
   // Debug Modal Elements
   const debugModal = document.getElementById('debugModal');
@@ -576,10 +594,21 @@
       // Load saved API key
       const savedKey = aiService.getAPIKey();
       console.log('Saved API key:', savedKey ? '(exists)' : '(none)');
+      const savedProxy = aiService.getProxyURL();
+      console.log('Saved proxy URL:', savedProxy ? savedProxy : '(none)');
       if (savedKey) {
         apiKeyInput.value = savedKey;
         statusEl.textContent = '✓ API key configured';
         statusEl.style.color = '#10b981';
+      }
+      if (savedProxy && proxyUrlInput) {
+        proxyUrlInput.value = savedProxy;
+        statusEl.textContent = '✓ Proxy configured';
+        statusEl.style.color = '#10b981';
+        testProxyConnection(savedProxy);
+      } else if (!savedProxy) {
+        statusEl.textContent = '⚠️ Hugging Face blocks browser calls. Configure the Embedding Proxy URL below.';
+        statusEl.style.color = '#fbbf24';
       }
 
       loadModules();
@@ -595,33 +624,51 @@
     console.log('Save config button clicked');
     try {
       const key = apiKeyInput.value.trim();
+      const proxyUrl = proxyUrlInput?.value.trim();
       console.log('API key length:', key.length);
 
-      if (!key) {
-        alert('Please enter your HuggingFace API key');
+      if (!key && !proxyUrl) {
+        alert('Please enter your HuggingFace API key or configure a proxy');
         return;
       }
 
-      if (!key.startsWith('hf_')) {
+      if (key && !key.startsWith('hf_')) {
         const proceed = confirm('Warning: HuggingFace API keys usually start with "hf_". Continue anyway?');
         if (!proceed) return;
       }
 
       console.log('Saving API key...');
-      aiService.setAPIKey(key);
+      if (key) {
+        aiService.setAPIKey(key);
+      }
+      if (proxyUrl) {
+        aiService.setProxyURL(proxyUrl);
+      } else {
+        aiService.setProxyURL('');
+      }
 
       // Verify it was saved
       const savedKey = localStorage.getItem('hf_api_key');
+      const savedProxy = localStorage.getItem('hf_proxy_url');
       console.log('Verification - saved to localStorage:', savedKey === key ? 'SUCCESS' : 'FAILED');
+      if (proxyUrl) {
+        console.log('Proxy URL saved:', savedProxy === proxyUrl ? 'SUCCESS' : 'FAILED');
+      }
 
-      if (savedKey === key) {
+      if ((key && savedKey === key) || (!key && savedProxy === proxyUrl)) {
         statusEl.textContent = '✓ Configuration saved successfully!';
         statusEl.style.color = '#10b981';
-        console.log('API key saved successfully');
+        console.log('Configuration saved successfully');
       } else {
         statusEl.textContent = '❌ Failed to save configuration';
         statusEl.style.color = '#ef4444';
-        console.error('API key save verification failed');
+        console.error('Configuration save verification failed');
+      }
+
+      if (!proxyUrl) {
+        alert('Embedding Proxy URL is still empty. Hugging Face blocks browser calls, so embeddings will fail until you set a proxy (see README).');
+      } else {
+        testProxyConnection(proxyUrl);
       }
 
       setTimeout(() => {
@@ -637,6 +684,16 @@
   };
 
   console.log('Event handler attached to save button');
+  if (testProxyBtn) {
+    testProxyBtn.onclick = () => {
+      const url = proxyUrlInput?.value.trim();
+      if (!url) {
+        alert('Enter a proxy URL first (e.g., http://localhost:8787/api/inference)');
+        return;
+      }
+      testProxyConnection(url);
+    };
+  }
 
   // Upload box click
   uploadBox.onclick = () => fileInput.click();
@@ -672,8 +729,8 @@
   async function processFile(file) {
     const moduleId = moduleIdInput.value.trim() || `module-${Date.now()}`;
 
-    if (!aiService.getAPIKey()) {
-      alert('Please configure your HuggingFace API key first');
+    if (!aiService.getAPIKey() && !aiService.getProxyURL()) {
+      alert('Please configure your HuggingFace API key or proxy first');
       return;
     }
 
@@ -981,6 +1038,33 @@
     } catch (error) {
       console.error('Failed to load modules:', error);
       modulesListEl.innerHTML = '<p class="tiny muted">Failed to load modules</p>';
+    }
+  }
+
+  async function testProxyConnection(url) {
+    if (!proxyStatusEl) return;
+    const normalized = url.endsWith('/') ? url.slice(0, -1) : url;
+    proxyStatusEl.textContent = 'Proxy status: checking...';
+    proxyStatusEl.style.color = '#9ca3af';
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    try {
+      const res = await fetch(`${normalized}/health`, { method: 'GET', signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (res.ok) {
+        proxyStatusEl.textContent = 'Proxy status: online';
+        proxyStatusEl.style.color = '#10b981';
+      } else {
+        proxyStatusEl.textContent = `Proxy status: unreachable (${res.status})`;
+        proxyStatusEl.style.color = '#ef4444';
+      }
+    } catch (err) {
+      clearTimeout(timeoutId);
+      const reason = err.name === 'AbortError' ? 'timeout' : err.message;
+      proxyStatusEl.textContent = `Proxy status: offline (${reason})`;
+      proxyStatusEl.style.color = '#ef4444';
     }
   }
 
