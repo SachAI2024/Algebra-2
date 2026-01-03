@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  # Backend API Service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: algebra-tutor-backend
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - HF_API_KEY=${HF_API_KEY}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - algebra-network
+
+  # Frontend Service (for production build serving)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: algebra-tutor-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - algebra-network
+
+networks:
+  algebra-network:
+    driver: bridge
+
+volumes:
+  node_modules_backend:
+  node_modules_frontend:
